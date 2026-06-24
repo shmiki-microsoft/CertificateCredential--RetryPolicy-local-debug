@@ -71,8 +71,8 @@ try:
     #     logging_enable=True)
 
     # 明示的にトークンを取得（通信不良ならここで例外）
-    access_token_raw = token_credential.get_token("https://management.azure.com//.default").token
-    print("access_token_raw", access_token_raw)
+    # access_token_raw = token_credential.get_token("https://management.azure.com//.default").token
+    # print("access_token_raw", access_token_raw)
 
     # Microsoft Graph SDK を使ってユーザーの一覧を取得
     # タイムアウトを指定するため httpx.AsyncClient をカスタム作成して渡す

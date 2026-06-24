@@ -55,8 +55,8 @@ try:
     #     logging_enable=True)
 
     # 明示的にトークンを取得
-    access_token_raw = token_credential.get_token("https://management.azure.com//.default").token
-    print("access_token_raw", access_token_raw)
+    # access_token_raw = token_credential.get_token("https://management.azure.com//.default").token
+    # print("access_token_raw", access_token_raw)
 
     # Microsoft Graph SDK を使ってユーザーの一覧を取得
     # カスタムミドルウェアを使わず、既定の GraphServiceClient を利用

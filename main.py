@@ -56,38 +56,84 @@ try:
     cert_password = os.getenv("AZURE_CLIENT_CERTIFICATE_PASSWORD")
 
     # トークン取得時の再試行ポリシーをカスタマイズ
+    # ------------------------------------------------------------------
     # 注意: CertificateCredential は retry_policy オブジェクトを受け付けず、
     #       内部で必ず RetryPolicy(**kwargs) を生成するため、retry_* の
     #       スカラー引数を直接渡す必要がある（BlobServiceClient とは異なる）。
-    # 既定値: retry_total=10
-    # logging_enable=True で HTTP 通信のデバッグログも出力する
-    # 証明書が .pfx ファイルの時
+    #
+    # RetryPolicy はエラーの種類ごとに別々のカウンターを持つ。
+    # retry_total だけを増やしても接続エラーは増えない点に注意:
+    #   - retry_total   : 全体の再試行上限（既定 10）。各カウンターの総和の上限
+    #   - retry_connect : 接続確立失敗(DNS解決失敗・接続不可)の再試行回数（既定 3）
+    #   - retry_read    : 応答読み取り失敗の再試行回数（既定 3）
+    #   - retry_status  : retry_on_status_codes 応答時の再試行回数（既定 3）
+    # 例: DNS解決失敗は retry_connect で数えられるため、retry_total=10 でも
+    #     retry_connect を上げないと初回+3回(=4回)で打ち切られる。
+    #
+    # バックオフ待機時間 = retry_backoff_factor * (2 ** n)（retry_backoff_max で上限）
+    # logging_enable=True で HTTP 通信のデバッグログも出力する。
+    #
+    # ★ 約3分(180秒)リトライし続ける設定 ★
+    #   retry_backoff_factor=20 と retry_backoff_max=20 を同値にして
+    #   2回目以降の待機を20秒で固定する。
+    #   待機: 0 + 20秒 × 9回 = 180秒(初回リトライのみ待機0秒)。
+    #   ※DNS解決失敗のように各試行が即座に返るケースでの概算。
+    #     接続タイムアウト時は connection_timeout 分が各試行に加算される。
+    # ------------------------------------------------------------------
+    # 証明書が .pfx ファイルの時 合計約 3 分のリトライ
     token_credential = CertificateCredential(
         tenant_id=tenant_id,
         client_id=client_id, 
         certificate_path=cert_path,
         password=cert_password, 
-        retry_total=5,                                    # 最大再試行回数
-        retry_backoff_factor=0.8,                         # 指数バックオフの基本待機時間(秒)
-        retry_backoff_max=60,                             # 最大待機時間(秒)
+        connection_timeout=30,                             # 接続確立までのタイムアウト(秒)
+        read_timeout=60,                                   # 応答待ちのタイムアウト(秒)
+        retry_total=10,                                    # 全体の再試行上限
+        retry_connect=10,                                  # 接続確立失敗(DNS解決失敗・接続不可)の再試行回数。既定3
+        retry_read=10,                                     # 応答読み取り失敗の再試行回数。既定3
+        retry_backoff_factor=20,                           # 指数バックオフの基本待機時間(秒)。max と同値で固定間隔化
+        retry_backoff_max=20,                              # 最大待機時間(秒)。1回あたり20秒で固定
         retry_on_status_codes=[408, 429, 500, 502, 503, 504],  # 再試行対象の HTTP ステータスコード
         logging_enable=True)
+
+    #証明書が .pfx ファイルの時 - リトライポリシーの比較用（合計約 1 分のリトライ）
+    #   retry_backoff_factor=20 と retry_backoff_max=20 を同値にして待機を20秒で固定。
+    #   待機: 0 + 20秒 × 3回 = 60秒(初回リトライのみ待機0秒)。
+    # token_credential = CertificateCredential(
+    #     tenant_id=tenant_id,
+    #     client_id=client_id, 
+    #     certificate_path=cert_path,
+    #     password=cert_password, 
+    #     connection_timeout=30,                           # 接続確立までのタイムアウト(秒)
+    #     read_timeout=60,                                 # 応答待ちのタイムアウト(秒)
+    #     retry_total=4,                                   # 全体の再試行上限
+    #     retry_connect=4,                                 # 接続確立失敗(DNS解決失敗・接続不可)の再試行回数。既定3
+    #     retry_read=4,                                    # 応答読み取り失敗の再試行回数。既定3
+    #     retry_backoff_factor=20,                         # 指数バックオフの基本待機時間(秒)。max と同値で固定間隔化
+    #     retry_backoff_max=20,                            # 最大待機時間(秒)。1回あたり20秒で固定
+    #     retry_on_status_codes=[408, 429, 500, 502, 503, 504],  # 再試行対象の HTTP ステータスコード
+    #     logging_enable=True)
+
 
     # 証明書が .pem ファイルの時
     # token_credential = CertificateCredential(
     #     tenant_id=tenant_id,
     #     client_id=client_id, 
     #     certificate_path=cert_path,
-    #     retry_total=5,
+    #     connection_timeout=30,
+    #     read_timeout=60,
+    #     retry_total=10,
+    #     retry_connect=10,
+    #     retry_read=10,
     #     retry_backoff_factor=0.8,
-    #     retry_backoff_max=60,
+    #     retry_backoff_max=180,
     #     retry_on_status_codes=[408, 429, 500, 502, 503, 504],
     #     logging_enable=True)
 
     # トークンを明示的に取得して確認する
     # （通常は各 Azure SDK のメソッド呼び出し時に自動でトークンが取得される）
-    access_token_raw = token_credential.get_token("https://management.azure.com//.default").token
-    print("access_token_raw",access_token_raw)
+    # access_token_raw = token_credential.get_token("https://management.azure.com//.default").token
+    # print("access_token_raw",access_token_raw)
 
     # Microsoft Graph SDK を使ってユーザーの一覧を取得
     # scopes には Graph 用の .default を指定する
