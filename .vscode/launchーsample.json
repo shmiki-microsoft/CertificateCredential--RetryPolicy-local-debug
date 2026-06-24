@@ -14,7 +14,36 @@
                 "AZURE_CLIENT_CERTIFICATE_PATH":"your certificate path",
                 "AZURE_CLIENT_CERTIFICATE_Password" :"your certificate password",
                 "endpoint": "https://graph.microsoft.com/v1.0/users",
-                "blob_service_uri": "your_blob_service_uri"
+                }
+        },
+        {
+            "name": "Python: main_simple.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main_simple.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "env": {
+                "AZURE_CLIENT_ID": "your_client_id",
+                "AZURE_TENANT_ID": "your_tenant_id",
+                "AZURE_CLIENT_CERTIFICATE_PATH":"your certificate path",
+                "AZURE_CLIENT_CERTIFICATE_Password" :"your certificate password",
+                "endpoint": "https://graph.microsoft.com/v1.0/users",
+                }
+        },
+        {
+            "name": "Python: main_no_retry.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main_no_retry.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "env": {
+                "AZURE_CLIENT_ID": "your_client_id",
+                "AZURE_TENANT_ID": "your_tenant_id",
+                "AZURE_CLIENT_CERTIFICATE_PATH":"your certificate path",
+                "AZURE_CLIENT_CERTIFICATE_Password" :"your certificate password",
+                "endpoint": "https://graph.microsoft.com/v1.0/users",
                 }
         }
     ]
