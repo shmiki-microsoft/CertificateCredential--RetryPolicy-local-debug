@@ -178,6 +178,34 @@ Graph SDK（`msgraph-sdk`）は azure.core のパイプラインではなく **k
 
 > kiota の RetryHandler は `429` / `503` / `504` などの **HTTP ステータスコードにのみ**再試行し、**接続エラー（通信不可）は再試行しません**。そのため `main.py` では接続エラー用に手動の指数バックオフ・リトライループを別途実装しています。
 
+### 参考リンク（Microsoft Learn）
+
+- [Python 用 Azure SDK ライブラリでの HTTP パイプラインと再試行](https://learn.microsoft.com/ja-jp/azure/developer/python/sdk/fundamentals/http-pipeline-retries) — HTTP パイプラインの概念・既定のリトライ構成・カスタマイズ方法
+- [azure.core.pipeline パッケージ](https://learn.microsoft.com/ja-jp/python/api/azure-core/azure.core.pipeline) — `Pipeline` / `PipelineRequest` / `PipelineResponse` など
+- [azure.core.pipeline.transport.RequestsTransport クラス](https://learn.microsoft.com/ja-jp/python/api/azure-core/azure.core.pipeline.transport.requeststransport) — タイムアウト（`connection_timeout` / `read_timeout`）を解釈する HTTP トランスポート
+- [azure.core.pipeline.policies.RetryPolicy クラス](https://learn.microsoft.com/ja-jp/python/api/azure-core/azure.core.pipeline.policies.retrypolicy) — `retry_total` / `retry_backoff_factor` / `retry_backoff_max` などのリトライ設定（既定 `retry_total=10`、再試行対象の既定ステータス `[408, 429, 500, 502, 503, 504]`）
+- [azure.identity.CertificateCredential クラス](https://learn.microsoft.com/ja-jp/python/api/azure-identity/azure.identity.certificatecredential) — 証明書ベースの認証資格情報（コンストラクタは `tenant_id`, `client_id`, `certificate_path`, `**kwargs`）
+
+### 参考リンク（GitHub ソースコード）
+
+azure-sdk-for-python リポジトリ（[Azure/azure-sdk-for-python](https://github.com/Azure/azure-sdk-for-python)）の該当ソース:
+
+- [`_credentials/certificate.py`](https://github.com/Azure/azure-sdk-for-python/blob/main/sdk/identity/azure-identity/azure/identity/_credentials/certificate.py) — `CertificateCredential` の定義（`**kwargs` を親へパススルー）
+- [`_internal/client_credential_base.py`](https://github.com/Azure/azure-sdk-for-python/blob/main/sdk/identity/azure-identity/azure/identity/_internal/client_credential_base.py) — 直接の親クラス `ClientCredentialBase`
+- [`_internal/msal_credentials.py`](https://github.com/Azure/azure-sdk-for-python/blob/main/sdk/identity/azure-identity/azure/identity/_internal/msal_credentials.py) — `MsalCredential`（`self._client = MsalClient(**kwargs)`）
+- [`_internal/msal_client.py`](https://github.com/Azure/azure-sdk-for-python/blob/main/sdk/identity/azure-identity/azure/identity/_internal/msal_client.py) — `MsalClient`（`build_pipeline(**kwargs)` を呼ぶ）
+- [`_internal/pipeline.py`](https://github.com/Azure/azure-sdk-for-python/blob/main/sdk/identity/azure-identity/azure/identity/_internal/pipeline.py) — `RetryPolicy(**kwargs)` / `RequestsTransport(**kwargs)` を生成するパイプライン構築
+- [`azure-core: _retry.py`](https://github.com/Azure/azure-sdk-for-python/blob/main/sdk/core/azure-core/azure/core/pipeline/policies/_retry.py) — `RetryPolicy` 本体（`retry_total` などを解釈）
+- [`azure-core: _requests_basic.py`](https://github.com/Azure/azure-sdk-for-python/blob/main/sdk/core/azure-core/azure/core/pipeline/transport/_requests_basic.py) — `RequestsTransport`（`connection_timeout` / `read_timeout` を解釈）
+- [`azure-storage-blob: _shared/base_client.py`](https://github.com/Azure/azure-sdk-for-python/blob/main/sdk/storage/azure-storage-blob/azure/storage/blob/_shared/base_client.py) — `BlobServiceClient` 側の `config.retry_policy = kwargs.get("retry_policy") or ExponentialRetry(**kwargs)`（オブジェクト渡しを採用する実装）
+
+Graph SDK / kiota 側:
+
+- [microsoftgraph/msgraph-sdk-python](https://github.com/microsoftgraph/msgraph-sdk-python) — `GraphServiceClient` / `GraphRequestAdapter`
+- [microsoft/kiota-http-python](https://github.com/microsoft/kiota-http-python) — `RetryHandlerOption` / RetryHandler ミドルウェア
+
+> **バージョン補足**: 本リポジトリで検証した `azure-identity 1.25.3` では、`CertificateCredential` に渡した `retry_policy` オブジェクトは無視されます（`pipeline.py` が必ず `RetryPolicy(**kwargs)` を生成するため）。一方、azure-identity の main ブランチでは `config.retry_policy = kwargs.pop("retry_policy", None) or RetryPolicy(**kwargs)` のように **`retry_policy` の上書きを許可する変更**（[#46072](https://github.com/Azure/azure-sdk-for-python/pull/46072)）が入っています。将来のバージョンではオブジェクト渡しも有効になる可能性があるため、利用中のバージョンの挙動を確認してください。
+
 ## 注意事項
 
 
