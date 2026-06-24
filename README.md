@@ -56,7 +56,90 @@ $env:AZURE_CLIENT_CERTIFICATE_PASSWORD = "<証明書パスワード>"
 - Microsoft Entra ID にアプリ登録を行い、証明書を登録済みであること
 - アプリに Microsoft Graph の `User.Read.All`（アプリケーション許可）など、ユーザー一覧取得に必要な API アクセス許可と管理者の同意が付与されていること
 
+## 自己署名証明書の作成方法
+
+`CertificateCredential` で使用する自己署名証明書は、以下のいずれかの方法で作成できます。作成した公開証明書（`.crt` / `.cer`）は Microsoft Entra ID のアプリ登録（[証明書とシークレット] > [証明書]）にアップロードし、秘密鍵を含むファイル（`.pem` / `.pfx`）をアプリケーション側で利用します。
+
+> **注意**: 証明書ファイル・秘密鍵・パスワードは機密情報です。リポジトリにコミットしないでください。
+
+### 方法 1: OpenSSL を使って PEM を作る
+
+> OpenSSL は Microsoft の製品ではありません。導入方法は各自でご確認ください。
+
+1. **OpenSSL を導入**する。
+2. Azure Portal の **[Microsoft Entra ID] > [アプリの登録] > 該当アプリ** に移動し、概要ページの **アプリケーション (クライアント) ID** と **ディレクトリ (テナント) ID** をメモする。
+3. 以下のコマンドを実行して PEM 形式の鍵・証明書を作成する。
+
+   ```powershell
+   openssl genrsa -out server.pem 2048
+   openssl req -new -key server.pem -out server.csr
+   openssl x509 -req -days 365 -in server.csr -signkey server.pem -out server.crt
+   ```
+
+   - `-days` オプションで有効期限（既定 365 日）を設定します。
+   - 引用元: [ms-identity-python-daemon (Optional - Create a self-signed certificate)](https://github.com/Azure-Samples/ms-identity-python-daemon/tree/master/2-Call-MsGraph-WithCertificate#optional-create-a-self-signed-certificate)
+
+4. `server.pem` と `server.crt` をテキストエディタで開き、**`server.pem` の末尾に `server.crt` の内容を貼り付けて保存**する（秘密鍵＋証明書を 1 つの PEM にまとめる）。
+5. Azure Portal の **[アプリの登録] > 該当アプリ > [証明書とシークレット] > [証明書]** タブで、`server.crt` をアップロードする。
+6. 環境変数 `AZURE_CLIENT_CERTIFICATE_PATH` に PEM ファイルのパスを設定する（`.pem` のためパスワードは不要）。
+
+### 方法 2: PowerShell を使って PFX を作る
+
+1. 以下のコマンドで自己署名証明書を作成する（出力される **Thumbprint** をメモする）。
+
+   ```powershell
+   $cert = New-SelfSignedCertificate -Subject "CN={certificateName}" -CertStoreLocation "Cert:\CurrentUser\My" -KeyExportPolicy Exportable -KeySpec Signature -KeyLength 2048 -KeyAlgorithm RSA -HashAlgorithm SHA256
+   $cert
+   ```
+
+   - 有効期限を変更する場合は `-NotAfter` オプションを追加します（既定は 1 年）。
+   - 公開情報: [New-SelfSignedCertificate (Example 7)](https://learn.microsoft.com/en-us/powershell/module/pki/new-selfsignedcertificate?view=windowsserver2022-ps#example-7)
+
+2. 公開証明書（`.cer`）をエクスポートする。
+
+   ```powershell
+   Export-Certificate -Cert $cert -FilePath "C:\Users\admin\Desktop\{certificateName}.cer"
+   ```
+
+3. 秘密鍵を含む `.pfx` をエクスポートする。
+
+   ```powershell
+   $mypwd = ConvertTo-SecureString -String "{myPassword}" -Force -AsPlainText
+   Export-PfxCertificate -Cert $cert -FilePath "C:\Users\admin\Desktop\{privateKeyName}.pfx" -Password $mypwd
+   ```
+
+   - `{myPassword}` が `.pfx` のパスワードになります。`AZURE_CLIENT_CERTIFICATE_PASSWORD` に設定します。
+   - 公開情報: [自己署名証明書を作成する (オプション 2)](https://learn.microsoft.com/ja-jp/azure/active-directory/develop/howto-create-self-signed-certificate#option-2-create-and-export-your-public-certificate-with-its-private-key)
+
+4. `.cer` ファイルを Microsoft Entra ID のアプリ登録（サービスプリンシパル）にアップロードする。
+5. 環境変数 `AZURE_CLIENT_CERTIFICATE_PATH` に `.pfx` のパス、`AZURE_CLIENT_CERTIFICATE_PASSWORD` にパスワードを設定する。
+
+### 方法 3: Azure CLI を使って PEM を作る
+
+1. **Azure CLI を導入**する。インストール手順: [Azure CLI のインストール](https://learn.microsoft.com/ja-jp/cli/azure/install-azure-cli)
+2. Azure Portal の **[アプリの登録] > 該当アプリ** で **クライアント ID** と **テナント ID** をメモする。
+3. 管理者アカウントでサインインする。
+
+   ```powershell
+   az login
+   ```
+
+4. 自己署名証明書を作成し、アプリ登録に証明書を登録する。
+
+   ```powershell
+   az ad app credential reset --id {アプリケーション(クライアント)ID} --create-cert
+   ```
+
+   > **★ 注意**: このコマンドは**アップロード済みの既存の証明書を削除します**。既存証明書を使用中のアプリがある場合、そのアプリで認証ができなくなります。
+
+   - 出力の `fileWithCertAndPrivateKey` に、証明書（秘密鍵）を含む PEM ファイルのパスが表示されます。このファイルをアプリケーション開発者に共有します。
+   - 有効期限は既定で 1 年です。`--years` オプションで変更できます（例: `az ad app credential reset --id {クライアントID} --create-cert --years 2`）。
+
+5. Azure Portal の **[アプリの登録] > 該当アプリ > [証明書とシークレット] > [証明書]** で、証明書がアップロードされていることを確認する。
+6. 環境変数 `AZURE_CLIENT_CERTIFICATE_PATH` に PEM ファイルのパスを設定する（`.pem` のためパスワードは不要）。
+
 ## セットアップ
+
 
 ```powershell
 # 仮想環境の作成と有効化

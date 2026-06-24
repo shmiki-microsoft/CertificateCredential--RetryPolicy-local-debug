@@ -13,14 +13,12 @@ from kiota_authentication_azure.azure_identity_authentication_provider import (
     AzureIdentityAuthenticationProvider,
 )
 
-#ロガーを取得
-# azure. で始まるモジュールのログすべてを取得
-logger = logging.getLogger('azure') 
-# blob ストレージのログのみに絞るとき
-# logger = logging.getLogger("azure.storage.blob")
-# DefaultAzureCredentialのログのみに絞るとき
-# logger = logging.getLogger('azure.identity')
-#ログレベルを設定
+# ロガーを取得（azure. で始まるモジュールのログをすべて取得）
+logger = logging.getLogger('azure')
+# 特定のモジュールに絞りたいときは以下のように指定する
+# logger = logging.getLogger("azure.storage.blob")   # Blob ストレージのみ
+# logger = logging.getLogger("azure.identity")       # 認証(Identity)のみ
+# ログレベルを設定
 logger.setLevel(logging.DEBUG)
 # ログメッセージのフォーマットを設定
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -40,7 +38,7 @@ print(
 )
 
 try:
-    #環境変数の設定内容の確認
+    # 環境変数の設定内容の確認
     print("---環境変数の設定内容---")
     print("AZURE_CLIENT_ID",os.getenv("AZURE_CLIENT_ID"))
     print("AZURE_CLIENT_SECRET",os.getenv("AZURE_CLIENT_SECRET"))
@@ -51,8 +49,7 @@ try:
     print("AZURE_PASSWORD",os.getenv("AZURE_PASSWORD"))
     print("-----------------------")
 
-    # 認証オブジェクトを取得
-    # logging_enable=True で HTTTP のログも出力デバックログを出力
+    # 環境変数からテナント/クライアント/証明書情報を取得
     tenant_id = os.getenv("AZURE_TENANT_ID")
     client_id = os.getenv("AZURE_CLIENT_ID")
     cert_path = os.getenv("AZURE_CLIENT_CERTIFICATE_PATH")
@@ -63,7 +60,8 @@ try:
     #       内部で必ず RetryPolicy(**kwargs) を生成するため、retry_* の
     #       スカラー引数を直接渡す必要がある（BlobServiceClient とは異なる）。
     # 既定値: retry_total=10
-    #証明書が .pfx ファイルの時
+    # logging_enable=True で HTTP 通信のデバッグログも出力する
+    # 証明書が .pfx ファイルの時
     token_credential = CertificateCredential(
         tenant_id=tenant_id,
         client_id=client_id, 
@@ -86,14 +84,12 @@ try:
     #     retry_on_status_codes=[408, 429, 500, 502, 503, 504],
     #     logging_enable=True)
 
-    # 取得するトークンのチェック
-    # 明示的にトークンを取得 実行しなくてもblob_service_client.list_containers() など
-    # 各 Azure リソース側のメソッドが自動的にトークンを呼び出し取得してくれる
+    # トークンを明示的に取得して確認する
+    # （通常は各 Azure SDK のメソッド呼び出し時に自動でトークンが取得される）
     access_token_raw = token_credential.get_token("https://management.azure.com//.default").token
     print("access_token_raw",access_token_raw)
 
     # Microsoft Graph SDK を使ってユーザーの一覧を取得
-    # GraphServiceClient は CertificateCredential をそのまま利用できる
     # scopes には Graph 用の .default を指定する
     scopes = ["https://graph.microsoft.com/.default"]
 
