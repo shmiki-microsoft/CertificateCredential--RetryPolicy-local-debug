@@ -1,0 +1,21 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: main.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "env": {
+                "AZURE_CLIENT_ID": "your_client_id",
+                "AZURE_TENANT_ID": "your_tenant_id",
+                "AZURE_CLIENT_CERTIFICATE_PATH":"your certificate path",
+                "AZURE_CLIENT_CERTIFICATE_Password" :"your certificate password",
+                "endpoint": "https://graph.microsoft.com/v1.0/users",
+                "blob_service_uri": "your_blob_service_uri"
+                }
+        }
+    ]
+}

@@ -1,0 +1,9 @@
+azure-core
+azure-identity
+azure-storage-blob
+msgraph-sdk
+msgraph-core
+microsoft-kiota-http
+microsoft-kiota-abstractions
+microsoft-kiota-authentication-azure
+httpx
