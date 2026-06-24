@@ -78,41 +78,56 @@ try:
     #   2回目以降の待機を20秒で固定する。
     #   待機: 0 + 20秒 × 9回 = 180秒(初回リトライのみ待機0秒)。
     #   ※DNS解決失敗のように各試行が即座に返るケースでの概算。
-    #     接続タイムアウト時は connection_timeout 分が各試行に加算される。
+    #     接続タイムアウト時は connection_timeout 分が各試行に加算される。    #
+    # 【メモ】connection_timeout / read_timeout の効果を確認するテスト方法（後で試す）
+    #   今のDNS解決失敗(getaddrinfo failed)では、接続を張る前に失敗するため
+    #   connection_timeout も read_timeout も効かない（各試行は即座に返る）。
+    #   タイムアウトを実際に効かせるには「DNS解決は成功するが接続/応答しない」状況を作る:
+    #     - connection_timeout の確認:
+    #         hosts ファイルで login.microsoftonline.com を到達不能IP
+    #         (例 10.255.255.1 など)に向ける → 各試行が connection_timeout 秒待つ。
+    #         例: C:\Windows\System32\drivers\etc\hosts に
+    #             10.255.255.1 login.microsoftonline.com
+    #         を追記（テスト後は必ず削除する）。
+    #     - read_timeout の確認:
+    #         接続はできるが応答を返さないモックサーバーを立てて向ける
+    #         → 各試行が read_timeout 秒待つ。
+    #   ※タイムアウトが効くと各試行にその秒数が加算されるため、
+    #     合計リトライ時間が「バックオフ合計 + タイムアウト×試行回数」に延びる。    
     # ------------------------------------------------------------------
     # 証明書が .pfx ファイルの時 合計約 3 分のリトライ
-    token_credential = CertificateCredential(
-        tenant_id=tenant_id,
-        client_id=client_id, 
-        certificate_path=cert_path,
-        password=cert_password, 
-        connection_timeout=30,                             # 接続確立までのタイムアウト(秒)
-        read_timeout=60,                                   # 応答待ちのタイムアウト(秒)
-        retry_total=10,                                    # 全体の再試行上限
-        retry_connect=10,                                  # 接続確立失敗(DNS解決失敗・接続不可)の再試行回数。既定3
-        retry_read=10,                                     # 応答読み取り失敗の再試行回数。既定3
-        retry_backoff_factor=20,                           # 指数バックオフの基本待機時間(秒)。max と同値で固定間隔化
-        retry_backoff_max=20,                              # 最大待機時間(秒)。1回あたり20秒で固定
-        retry_on_status_codes=[408, 429, 500, 502, 503, 504],  # 再試行対象の HTTP ステータスコード
-        logging_enable=True)
-
-    #証明書が .pfx ファイルの時 - リトライポリシーの比較用（合計約 1 分のリトライ）
-    #   retry_backoff_factor=20 と retry_backoff_max=20 を同値にして待機を20秒で固定。
-    #   待機: 0 + 20秒 × 3回 = 60秒(初回リトライのみ待機0秒)。
     # token_credential = CertificateCredential(
     #     tenant_id=tenant_id,
     #     client_id=client_id, 
     #     certificate_path=cert_path,
     #     password=cert_password, 
-    #     connection_timeout=30,                           # 接続確立までのタイムアウト(秒)
-    #     read_timeout=60,                                 # 応答待ちのタイムアウト(秒)
-    #     retry_total=4,                                   # 全体の再試行上限
-    #     retry_connect=4,                                 # 接続確立失敗(DNS解決失敗・接続不可)の再試行回数。既定3
-    #     retry_read=4,                                    # 応答読み取り失敗の再試行回数。既定3
-    #     retry_backoff_factor=20,                         # 指数バックオフの基本待機時間(秒)。max と同値で固定間隔化
-    #     retry_backoff_max=20,                            # 最大待機時間(秒)。1回あたり20秒で固定
+    #     connection_timeout=30,                             # 接続確立までのタイムアウト(秒)
+    #     read_timeout=60,                                   # 応答待ちのタイムアウト(秒)
+    #     retry_total=10,                                    # 全体の再試行上限
+    #     retry_connect=10,                                  # 接続確立失敗(DNS解決失敗・接続不可)の再試行回数。既定3
+    #     retry_read=10,                                     # 応答読み取り失敗の再試行回数。既定3
+    #     retry_backoff_factor=20,                           # 指数バックオフの基本待機時間(秒)。max と同値で固定間隔化
+    #     retry_backoff_max=20,                              # 最大待機時間(秒)。1回あたり20秒で固定
     #     retry_on_status_codes=[408, 429, 500, 502, 503, 504],  # 再試行対象の HTTP ステータスコード
     #     logging_enable=True)
+
+    #証明書が .pfx ファイルの時 - リトライポリシーの比較用（合計約 1 分のリトライ）
+    #   retry_backoff_factor=20 と retry_backoff_max=20 を同値にして待機を20秒で固定。
+    #   待機: 0 + 20秒 × 3回 = 60秒(初回リトライのみ待機0秒)。
+    token_credential = CertificateCredential(
+        tenant_id=tenant_id,
+        client_id=client_id, 
+        certificate_path=cert_path,
+        password=cert_password, 
+        connection_timeout=30,                           # 接続確立までのタイムアウト(秒)
+        read_timeout=60,                                 # 応答待ちのタイムアウト(秒)
+        retry_total=4,                                   # 全体の再試行上限
+        retry_connect=4,                                 # 接続確立失敗(DNS解決失敗・接続不可)の再試行回数。既定3
+        retry_read=4,                                    # 応答読み取り失敗の再試行回数。既定3
+        retry_backoff_factor=20,                         # 指数バックオフの基本待機時間(秒)。max と同値で固定間隔化
+        retry_backoff_max=20,                            # 最大待機時間(秒)。1回あたり20秒で固定
+        retry_on_status_codes=[408, 429, 500, 502, 503, 504],  # 再試行対象の HTTP ステータスコード
+        logging_enable=True)
 
 
     # 証明書が .pem ファイルの時
