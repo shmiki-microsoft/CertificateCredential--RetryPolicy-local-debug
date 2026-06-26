@@ -96,7 +96,13 @@
                 "AZURE_CLIENT_CERTIFICATE_PASSWORD": "your certificate password",
                 "PATTERN": "timeout",
                 "TARGET": "both",
-                "DEBUG_PROXY": "http://127.0.0.1:3128"
+                "DEBUG_PROXY": "http://127.0.0.1:3128",
+                "AZURE_CONNECTION_TIMEOUT": "30",
+                "AZURE_READ_TIMEOUT": "60",
+                "HTTPX_CONNECT": "30",
+                "HTTPX_READ": "60",
+                "HTTPX_WRITE": "60",
+                "HTTPX_POOL": "5"
                 }
         },
         {
@@ -113,7 +119,17 @@
                 "AZURE_CLIENT_CERTIFICATE_PASSWORD": "your certificate password",
                 "PATTERN": "retry",
                 "TARGET": "both",
-                "DEBUG_PROXY": "http://127.0.0.1:3128"
+                "DEBUG_PROXY": "http://127.0.0.1:3128",
+                "AZURE_RETRY_TOTAL": "4",
+                "AZURE_RETRY_CONNECT": "4",
+                "AZURE_RETRY_READ": "4",
+                "AZURE_RETRY_BACKOFF_FACTOR": "20",
+                "AZURE_RETRY_BACKOFF_MAX": "20",
+                "GRAPH_MAX_RETRIES": "4",
+                "GRAPH_DELAY": "5",
+                "GRAPH_MANUAL_MAX_ATTEMPTS": "4",
+                "GRAPH_MANUAL_BACKOFF_FACTOR": "20",
+                "GRAPH_MANUAL_BACKOFF_MAX": "20"
                 }
         },
         {
@@ -130,7 +146,23 @@
                 "AZURE_CLIENT_CERTIFICATE_PASSWORD": "your certificate password",
                 "PATTERN": "both",
                 "TARGET": "both",
-                "DEBUG_PROXY": "http://127.0.0.1:3128"
+                "DEBUG_PROXY": "http://127.0.0.1:3128",
+                "AZURE_CONNECTION_TIMEOUT": "30",
+                "AZURE_READ_TIMEOUT": "60",
+                "HTTPX_CONNECT": "30",
+                "HTTPX_READ": "60",
+                "HTTPX_WRITE": "60",
+                "HTTPX_POOL": "5",
+                "AZURE_RETRY_TOTAL": "4",
+                "AZURE_RETRY_CONNECT": "4",
+                "AZURE_RETRY_READ": "4",
+                "AZURE_RETRY_BACKOFF_FACTOR": "20",
+                "AZURE_RETRY_BACKOFF_MAX": "20",
+                "GRAPH_MAX_RETRIES": "4",
+                "GRAPH_DELAY": "5",
+                "GRAPH_MANUAL_MAX_ATTEMPTS": "4",
+                "GRAPH_MANUAL_BACKOFF_FACTOR": "20",
+                "GRAPH_MANUAL_BACKOFF_MAX": "20"
                 }
         }
     ]

@@ -273,8 +273,8 @@ python verify.py
 | --- | --- | --- |
 | `AZURE_CONNECTION_TIMEOUT` / `AZURE_READ_TIMEOUT` | `30` / `60` | azure.core タイムアウト(秒) |
 | `HTTPX_CONNECT` / `HTTPX_READ` / `HTTPX_WRITE` / `HTTPX_POOL` | `30` / `60` / `60` / `5` | httpx タイムアウト(秒) |
-| `RETRY_TOTAL` / `RETRY_CONNECT` / `RETRY_READ` | `4` | azure.core リトライ回数 |
-| `RETRY_BACKOFF_FACTOR` / `RETRY_BACKOFF_MAX` | `20` / `20` | azure.core バックオフ |
+| `AZURE_RETRY_TOTAL` / `AZURE_RETRY_CONNECT` / `AZURE_RETRY_READ` | `4` | azure.core リトライ回数 |
+| `AZURE_RETRY_BACKOFF_FACTOR` / `AZURE_RETRY_BACKOFF_MAX` | `20` / `20` | azure.core バックオフ |
 | `GRAPH_MAX_RETRIES` / `GRAPH_DELAY` | `4` / `5` | Graph(kiota) リトライ |
 | `GRAPH_MANUAL_MAX_ATTEMPTS` / `GRAPH_MANUAL_BACKOFF_FACTOR` / `GRAPH_MANUAL_BACKOFF_MAX` | `4` / `20` / `20` | Graph 接続エラー用の手動リトライ |
 | `AZURE_SCOPE` | `https://management.azure.com/.default` | トークン取得スコープ |
