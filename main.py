@@ -1,3 +1,11 @@
+"""
+リトライ版: CertificateCredential にリトライ・タイムアウトを明示設定した実用サンプル。
+
+- CertificateCredential に retry_*(固定間隔) とタイムアウトを指定してトークン取得をリトライ
+- Graph SDK(kiota) は RetryHandlerOption でリトライし、接続エラーは手動ループで再試行
+- DEBUG_PROXY でプロキシ経由の検証が可能。例外は終了コード付きでハンドリング
+- リトライ/タイムアウトを 4 パターンで切り替えて観測したい場合は verify.py を使う。
+"""
 import os
 import logging
 import sys
@@ -56,21 +64,18 @@ try:
     cert_password = os.getenv("AZURE_CLIENT_CERTIFICATE_PASSWORD")
 
     # === 検証用プロキシ設定 =============================================
-    # 環境変数 DEBUG_PROXY で proxy 経由のオン/オフを切り替える。
-    #   - DEBUG_PROXY=1 / true / on        → 既定 http://127.0.0.1:3128 を使用
-    #   - DEBUG_PROXY=http://host:port     → その URL をプロキシとして使用
-    #   - 未設定 / 0 / false / off        → プロキシを使わず直接通信
+    # 環境変数 DEBUG_PROXY にプロキシURLを設定すると、その URL 経由で通信する。
+    #   - DEBUG_PROXY=http://127.0.0.1:3128 など  → その URL のプロキシ経由
+    #   - 未設定 / 空 / 0 / false / off / no    → プロキシを使わず直接通信
     # プロキシ側で遅延・ブロック・切断などを発生させ、本プログラムの
     # リトライポリシーやタイムアウトを検証するための設定。
     #   - CertificateCredential(azure.core/requests): proxies={"http":..., "https":...}
     #   - Graph SDK(httpx 0.28+): httpx.AsyncClient(proxy=...)
     _proxy_env = os.getenv("DEBUG_PROXY", "").strip()
-    if _proxy_env.lower() in ("1", "true", "on", "yes"):
-        proxy_url = "http://127.0.0.1:3128"             # 既定の検証用プロキシ
-    elif _proxy_env.lower() in ("", "0", "false", "off", "no"):
+    if _proxy_env.lower() in ("", "0", "false", "off", "no"):
         proxy_url = None                                # プロキシ無効（直接通信）
     else:
-        proxy_url = _proxy_env                          # 明示指定された URL を使用
+        proxy_url = _proxy_env                          # 環境変数で指定された URL を使用
     # azure.core(requests) 用の proxies dict（無効時は None）
     proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
     print(f"DEBUG_PROXY: {'経由 ' + proxy_url if proxy_url else '無効（直接通信）'}")
@@ -94,48 +99,11 @@ try:
     # バックオフ待機時間 = retry_backoff_factor * (2 ** n)（retry_backoff_max で上限）
     # logging_enable=True で HTTP 通信のデバッグログも出力する。
     #
-    # ★ 約3分(180秒)リトライし続ける設定 ★
-    #   retry_backoff_factor=20 と retry_backoff_max=20 を同値にして
-    #   2回目以降の待機を20秒で固定する。
-    #   待機: 0 + 20秒 × 9回 = 180秒(初回リトライのみ待機0秒)。
-    #   ※DNS解決失敗のように各試行が即座に返るケースでの概算。
-    #     接続タイムアウト時は connection_timeout 分が各試行に加算される。    #
-    # 【メモ】connection_timeout / read_timeout の効果を確認するテスト方法（後で試す）
-    #   今のDNS解決失敗(getaddrinfo failed)では、接続を張る前に失敗するため
-    #   connection_timeout も read_timeout も効かない（各試行は即座に返る）。
-    #   タイムアウトを実際に効かせるには「DNS解決は成功するが接続/応答しない」状況を作る:
-    #     - connection_timeout の確認:
-    #         hosts ファイルで login.microsoftonline.com を到達不能IP
-    #         (例 10.255.255.1 など)に向ける → 各試行が connection_timeout 秒待つ。
-    #         例: C:\Windows\System32\drivers\etc\hosts に
-    #             10.255.255.1 login.microsoftonline.com
-    #         を追記（テスト後は必ず削除する）。
-    #     - read_timeout の確認:
-    #         接続はできるが応答を返さないモックサーバーを立てて向ける
-    #         → 各試行が read_timeout 秒待つ。
-    #   ※タイムアウトが効くと各試行にその秒数が加算されるため、
-    #     合計リトライ時間が「バックオフ合計 + タイムアウト×試行回数」に延びる。    
+    # retry_backoff_factor と retry_backoff_max を同値にすると待機が固定間隔になり、
+    # 合計リトライ時間が「0 + 固定秒 × (retry_total-1)」で計算しやすい。
+    # （タイムアウトの検証方法・パラメータ詳細は README / verify.py を参照）
     # ------------------------------------------------------------------
-    # 証明書が .pfx ファイルの時 合計約 3 分のリトライ
-    # token_credential = CertificateCredential(
-    #     tenant_id=tenant_id,
-    #     client_id=client_id, 
-    #     certificate_path=cert_path,
-    #     password=cert_password, 
-    #     proxies=proxies,                                   # 検証用プロキシ経由（DEBUG_PROXY で切替）
-    #     connection_timeout=30,                             # 接続確立までのタイムアウト(秒)
-    #     read_timeout=60,                                   # 応答待ちのタイムアウト(秒)
-    #     retry_total=10,                                    # 全体の再試行上限
-    #     retry_connect=10,                                  # 接続確立失敗(DNS解決失敗・接続不可)の再試行回数。既定3
-    #     retry_read=10,                                     # 応答読み取り失敗の再試行回数。既定3
-    #     retry_backoff_factor=20,                           # 指数バックオフの基本待機時間(秒)。max と同値で固定間隔化
-    #     retry_backoff_max=20,                              # 最大待機時間(秒)。1回あたり20秒で固定
-    #     retry_on_status_codes=[408, 429, 500, 502, 503, 504],  # 再試行対象の HTTP ステータスコード
-    #     logging_enable=True)
-
-    #証明書が .pfx ファイルの時 - リトライポリシーの比較用（合計約 1 分のリトライ）
-    #   retry_backoff_factor=20 と retry_backoff_max=20 を同値にして待機を20秒で固定。
-    #   待機: 0 + 20秒 × 3回 = 60秒(初回リトライのみ待機0秒)。
+    # 証明書が .pfx ファイルの時（固定20秒 × 3回 = 合計約60秒のリトライ）
     token_credential = CertificateCredential(
         tenant_id=tenant_id,
         client_id=client_id, 
@@ -153,7 +121,7 @@ try:
         logging_enable=True)
 
 
-    # 証明書が .pem ファイルの時
+    # 証明書が .pem ファイルの時（.pem ではパスワード引数は不要）
     # token_credential = CertificateCredential(
     #     tenant_id=tenant_id,
     #     client_id=client_id, 
@@ -161,17 +129,17 @@ try:
     #     proxies=proxies,
     #     connection_timeout=30,
     #     read_timeout=60,
-    #     retry_total=10,
-    #     retry_connect=10,
-    #     retry_read=10,
-    #     retry_backoff_factor=0.8,
-    #     retry_backoff_max=180,
+    #     retry_total=4,
+    #     retry_connect=4,
+    #     retry_read=4,
+    #     retry_backoff_factor=20,
+    #     retry_backoff_max=20,
     #     retry_on_status_codes=[408, 429, 500, 502, 503, 504],
     #     logging_enable=True)
 
     # トークンを明示的に取得して確認する
     # （通常は各 Azure SDK のメソッド呼び出し時に自動でトークンが取得される）
-    # access_token_raw = token_credential.get_token("https://management.azure.com//.default").token
+    # access_token_raw = token_credential.get_token("https://management.azure.com/.default").token
     # print("access_token_raw",access_token_raw)
 
     # Microsoft Graph SDK を使ってユーザーの一覧を取得
@@ -192,7 +160,7 @@ try:
         token_credential, scopes=scopes)
 
     # カスタムリトライ設定を適用した既定ミドルウェア付き HTTP クライアントを作成
-    # 検証用プロキシ(127.0.0.1:3128)経由にし、タイムアウトも指定する
+    # DEBUG_PROXY を指定していればそのプロキシ経由にし、タイムアウトも指定する
     # httpx.Timeout: connect=接続, read=読み取り, write=送信, pool=接続プール待ち(秒)
     graph_timeout = httpx.Timeout(connect=30.0, read=60.0, write=60.0, pool=5.0)
     http_client = GraphClientFactory.create_with_default_middleware(
@@ -251,7 +219,7 @@ except exceptions.ClientAuthenticationError as e:
     sys.exit(1)
 except (exceptions.ServiceRequestError, exceptions.ServiceResponseError) as e:
     # azure.core 側の通信エラー（接続不可・送信/応答失敗）。
-    # RetryPolicy(retry_total=5) を使い果たした後に到達 = リトライ枯渇
+    # RetryPolicy のリトライを使い果たした後に到達 = リトライ枯渇
     logger.error("Azure への通信がリトライ枯渇により失敗しました: %s", e)
     print("Azure への通信に失敗しました（リトライ枯渇）。ネットワーク接続を確認してください:", e)
     sys.exit(2)

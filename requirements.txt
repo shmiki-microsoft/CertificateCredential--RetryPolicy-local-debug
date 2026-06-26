@@ -1,6 +1,5 @@
 azure-core
 azure-identity
-azure-storage-blob
 msgraph-sdk
 msgraph-core
 microsoft-kiota-http

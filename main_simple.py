@@ -46,19 +46,16 @@ try:
     cert_password = os.getenv("AZURE_CLIENT_CERTIFICATE_PASSWORD")
 
     # === 検証用プロキシ設定 =============================================
-    # 環境変数 DEBUG_PROXY で proxy 経由のオン/オフを切り替える。
-    #   - DEBUG_PROXY=1 / true / on        → 既定 http://127.0.0.1:3128 を使用
-    #   - DEBUG_PROXY=http://host:port     → その URL をプロキシとして使用
-    #   - 未設定 / 0 / false / off        → プロキシを使わず直接通信
+    # 環境変数 DEBUG_PROXY にプロキシURLを設定すると、その URL 経由で通信する。
+    #   - DEBUG_PROXY=http://127.0.0.1:3128 など  → その URL のプロキシ経由
+    #   - 未設定 / 空 / 0 / false / off / no    → プロキシを使わず直接通信
     #   - CertificateCredential(azure.core/requests): proxies={"http":..., "https":...}
     #   - Graph SDK(httpx 0.28+): httpx.AsyncClient(proxy=...)
     _proxy_env = os.getenv("DEBUG_PROXY", "").strip()
-    if _proxy_env.lower() in ("1", "true", "on", "yes"):
-        proxy_url = "http://127.0.0.1:3128"             # 既定の検証用プロキシ
-    elif _proxy_env.lower() in ("", "0", "false", "off", "no"):
+    if _proxy_env.lower() in ("", "0", "false", "off", "no"):
         proxy_url = None                                # プロキシ無効（直接通信）
     else:
-        proxy_url = _proxy_env                          # 明示指定された URL を使用
+        proxy_url = _proxy_env                          # 環境変数で指定された URL を使用
     proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
     print(f"DEBUG_PROXY: {'経由 ' + proxy_url if proxy_url else '無効（直接通信）'}")
     # ------------------------------------------------------------------
