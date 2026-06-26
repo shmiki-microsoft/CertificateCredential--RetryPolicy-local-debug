@@ -161,15 +161,29 @@ class Config:
 # ロギング & 計測
 # ---------------------------------------------------------------------------
 def setup_logging() -> logging.Logger:
-    logger = logging.getLogger("azure")
-    logger.setLevel(logging.DEBUG)
-    if not logger.handlers:
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-        handler = logging.StreamHandler()
-        handler.setLevel(logging.DEBUG)
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    handler = logging.StreamHandler()
+    handler.setLevel(logging.DEBUG)
+    handler.setFormatter(formatter)
+    # Azure(azure.core / azure.identity) と Graph SDK(kiota / httpx) 双方の DEBUG ログを出す。
+    # Graph SDK は azure ロガーではなく httpx / httpcore / kiota / msgraph のロガーを使うため、
+    # それぞれを DEBUG に設定してハンドラーを付ける。
+    target_loggers = (
+        "azure",                       # azure.core / azure.identity（トークン取得）
+        "httpx",                       # Graph SDK が使う HTTP クライアント
+        "httpcore",                    # httpx の下層（接続・送受信）
+        "msgraph",                     # Microsoft Graph SDK
+        "msgraph_core",
+        "kiota_http",                  # kiota ミドルウェア（リトライ等）
+        "kiota_abstractions",
+        "kiota_authentication_azure",
+    )
+    for name in target_loggers:
+        lg = logging.getLogger(name)
+        lg.setLevel(logging.DEBUG)
+        if not any(isinstance(h, logging.StreamHandler) for h in lg.handlers):
+            lg.addHandler(handler)
     return logging.getLogger("verify")
 
 
@@ -374,7 +388,7 @@ async def run_graph_probe(cfg: Config, logger: logging.Logger) -> dict:
                     cfg.graph_manual_backoff_max,
                 )
                 logger.warning(
-                    "Graph 接続失敗 (手動試行 %d/%d)。%.1f 秒後に再試行: %s",
+                    "Graph 接続失敗 (手動試行 %d/%d)。%.1f 秒後に再試行: %r",
                     attempt, attempts_allowed, wait, e)
                 await asyncio.sleep(wait)
         if last_exc is not None:

@@ -37,6 +37,13 @@ handler.setFormatter(formatter)
 # ロガーにハンドラーを追加
 logger.addHandler(handler)
 
+# Graph SDK(kiota / httpx) のログも出す（azure ロガーとは別系統のため）
+for _name in ("httpx", "httpcore", "msgraph", "msgraph_core",
+              "kiota_http", "kiota_abstractions", "kiota_authentication_azure"):
+    _lg = logging.getLogger(_name)
+    _lg.setLevel(logging.DEBUG)
+    _lg.addHandler(handler)
+
 # ログレベルの確認
 print(
     f"Logger enabled for ERROR={logger.isEnabledFor(logging.ERROR)}, "
@@ -189,11 +196,11 @@ try:
                 if attempt == max_attempts:
                     # 再試行を使い果たしたら例外を再送出して上位でハンドリング
                     logger.error(
-                        "Graph への接続に %d 回失敗しました: %s", max_attempts, e)
+                        "Graph への接続に %d 回失敗しました: %r", max_attempts, e)
                     raise
                 wait = min(backoff_factor * (2 ** (attempt - 1)), backoff_max)
                 logger.warning(
-                    "Graph への接続に失敗 (試行 %d/%d)。%.1f 秒後に再試行: %s",
+                    "Graph への接続に失敗 (試行 %d/%d)。%.1f 秒後に再試行: %r",
                     attempt, max_attempts, wait, e)
                 await asyncio.sleep(wait)
 

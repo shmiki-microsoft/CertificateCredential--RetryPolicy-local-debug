@@ -24,6 +24,13 @@ handler.setLevel(logging.DEBUG)
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
+# Graph SDK(kiota / httpx) のログも出す（azure ロガーとは別系統のため）
+for _name in ("httpx", "httpcore", "msgraph", "msgraph_core",
+              "kiota_http", "kiota_abstractions", "kiota_authentication_azure"):
+    _lg = logging.getLogger(_name)
+    _lg.setLevel(logging.DEBUG)
+    _lg.addHandler(handler)
+
 try:
     # 環境変数の設定内容の確認
     print("---環境変数の設定内容---")
