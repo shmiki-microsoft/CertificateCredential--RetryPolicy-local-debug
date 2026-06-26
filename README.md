@@ -340,9 +340,11 @@ VS Code では `verify: ① default` 〜 `verify: ④ both` の構成を `.vscod
 
 #### バックオフ待機時間の計算式（exponential モード）
 
-$$ \text{wait}_n = \min\left( \text{retry\_backoff\_factor} \times 2^{(n-1)},\ \text{retry\_backoff\_max} \right) $$
+```text
+wait(n) = min( retry_backoff_factor × 2^(n-1), retry_backoff_max )
+```
 
-- $n$ は累積した再試行回数。**初回の再試行のみ待機0秒**（多くのエラーは即時の再試行で解決するため）。
+- `n` は累積した再試行回数。**初回の再試行のみ待機0秒**（多くのエラーは即時の再試行で解決するため）。
 - 例（`factor=0.8`）: `0, 1.6, 3.2, 6.4, 12.8, ...`（`retry_backoff_max` で頭打ち）
 
 ### Microsoft Graph SDK（kiota）側のパラメータ
