@@ -12,8 +12,25 @@
                 "AZURE_CLIENT_ID": "your_client_id",
                 "AZURE_TENANT_ID": "your_tenant_id",
                 "AZURE_CLIENT_CERTIFICATE_PATH":"your certificate path",
-                "AZURE_CLIENT_CERTIFICATE_Password" :"your certificate password",
+                "AZURE_CLIENT_CERTIFICATE_PASSWORD" :"your certificate password",
                 "endpoint": "https://graph.microsoft.com/v1.0/users",
+                "DEBUG_PROXY": "0"
+                }
+        },
+        {
+            "name": "Python: main.py (proxy 127.0.0.1:3128)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "env": {
+                "AZURE_CLIENT_ID": "your_client_id",
+                "AZURE_TENANT_ID": "your_tenant_id",
+                "AZURE_CLIENT_CERTIFICATE_PATH":"your certificate path",
+                "AZURE_CLIENT_CERTIFICATE_PASSWORD" :"your certificate password",
+                "endpoint": "https://graph.microsoft.com/v1.0/users",
+                "DEBUG_PROXY": "1"
                 }
         },
         {
@@ -27,8 +44,9 @@
                 "AZURE_CLIENT_ID": "your_client_id",
                 "AZURE_TENANT_ID": "your_tenant_id",
                 "AZURE_CLIENT_CERTIFICATE_PATH":"your certificate path",
-                "AZURE_CLIENT_CERTIFICATE_Password" :"your certificate password",
+                "AZURE_CLIENT_CERTIFICATE_PASSWORD" :"your certificate password",
                 "endpoint": "https://graph.microsoft.com/v1.0/users",
+                "DEBUG_PROXY": "0"
                 }
         },
         {
@@ -42,8 +60,9 @@
                 "AZURE_CLIENT_ID": "your_client_id",
                 "AZURE_TENANT_ID": "your_tenant_id",
                 "AZURE_CLIENT_CERTIFICATE_PATH":"your certificate path",
-                "AZURE_CLIENT_CERTIFICATE_Password" :"your certificate password",
+                "AZURE_CLIENT_CERTIFICATE_PASSWORD" :"your certificate password",
                 "endpoint": "https://graph.microsoft.com/v1.0/users",
+                "DEBUG_PROXY": "0"
                 }
         }
     ]

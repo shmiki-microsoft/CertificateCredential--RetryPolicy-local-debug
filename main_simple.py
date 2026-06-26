@@ -45,6 +45,24 @@ try:
     cert_path = os.getenv("AZURE_CLIENT_CERTIFICATE_PATH")
     cert_password = os.getenv("AZURE_CLIENT_CERTIFICATE_PASSWORD")
 
+    # === 検証用プロキシ設定 =============================================
+    # 環境変数 DEBUG_PROXY で proxy 経由のオン/オフを切り替える。
+    #   - DEBUG_PROXY=1 / true / on        → 既定 http://127.0.0.1:3128 を使用
+    #   - DEBUG_PROXY=http://host:port     → その URL をプロキシとして使用
+    #   - 未設定 / 0 / false / off        → プロキシを使わず直接通信
+    #   - CertificateCredential(azure.core/requests): proxies={"http":..., "https":...}
+    #   - Graph SDK(httpx 0.28+): httpx.AsyncClient(proxy=...)
+    _proxy_env = os.getenv("DEBUG_PROXY", "").strip()
+    if _proxy_env.lower() in ("1", "true", "on", "yes"):
+        proxy_url = "http://127.0.0.1:3128"             # 既定の検証用プロキシ
+    elif _proxy_env.lower() in ("", "0", "false", "off", "no"):
+        proxy_url = None                                # プロキシ無効（直接通信）
+    else:
+        proxy_url = _proxy_env                          # 明示指定された URL を使用
+    proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
+    print(f"DEBUG_PROXY: {'経由 ' + proxy_url if proxy_url else '無効（直接通信）'}")
+    # ------------------------------------------------------------------
+
     # 認証オブジェクトを取得
     # retry_total=0 で既定のリトライを無効化（通信不良時は即座に例外を送出）
     # connection_timeout: 接続確立までのタイムアウト(秒)
@@ -55,6 +73,7 @@ try:
         client_id=client_id,
         certificate_path=cert_path,
         password=cert_password,
+        proxies=proxies,
         retry_total=0,
         connection_timeout=10,
         read_timeout=30,
@@ -65,6 +84,7 @@ try:
     #     tenant_id=tenant_id,
     #     client_id=client_id,
     #     certificate_path=cert_path,
+    #     proxies=proxies,
     #     retry_total=0,
     #     connection_timeout=10,
     #     read_timeout=30,
@@ -80,7 +100,7 @@ try:
     scopes = ["https://graph.microsoft.com/.default"]
     timeout = httpx.Timeout(connect=10.0, read=30.0, write=30.0, pool=5.0)
     http_client = GraphClientFactory.create_with_default_middleware(
-        client=httpx.AsyncClient(timeout=timeout))
+        client=httpx.AsyncClient(proxy=proxy_url, timeout=timeout))
     auth_provider = AzureIdentityAuthenticationProvider(token_credential, scopes=scopes)
     request_adapter = GraphRequestAdapter(auth_provider, http_client)
     graph_client = GraphServiceClient(request_adapter=request_adapter)

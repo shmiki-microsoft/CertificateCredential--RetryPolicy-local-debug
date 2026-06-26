@@ -55,6 +55,27 @@ try:
     cert_path = os.getenv("AZURE_CLIENT_CERTIFICATE_PATH")
     cert_password = os.getenv("AZURE_CLIENT_CERTIFICATE_PASSWORD")
 
+    # === 検証用プロキシ設定 =============================================
+    # 環境変数 DEBUG_PROXY で proxy 経由のオン/オフを切り替える。
+    #   - DEBUG_PROXY=1 / true / on        → 既定 http://127.0.0.1:3128 を使用
+    #   - DEBUG_PROXY=http://host:port     → その URL をプロキシとして使用
+    #   - 未設定 / 0 / false / off        → プロキシを使わず直接通信
+    # プロキシ側で遅延・ブロック・切断などを発生させ、本プログラムの
+    # リトライポリシーやタイムアウトを検証するための設定。
+    #   - CertificateCredential(azure.core/requests): proxies={"http":..., "https":...}
+    #   - Graph SDK(httpx 0.28+): httpx.AsyncClient(proxy=...)
+    _proxy_env = os.getenv("DEBUG_PROXY", "").strip()
+    if _proxy_env.lower() in ("1", "true", "on", "yes"):
+        proxy_url = "http://127.0.0.1:3128"             # 既定の検証用プロキシ
+    elif _proxy_env.lower() in ("", "0", "false", "off", "no"):
+        proxy_url = None                                # プロキシ無効（直接通信）
+    else:
+        proxy_url = _proxy_env                          # 明示指定された URL を使用
+    # azure.core(requests) 用の proxies dict（無効時は None）
+    proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
+    print(f"DEBUG_PROXY: {'経由 ' + proxy_url if proxy_url else '無効（直接通信）'}")
+    # ------------------------------------------------------------------
+
     # トークン取得時の再試行ポリシーをカスタマイズ
     # ------------------------------------------------------------------
     # 注意: CertificateCredential は retry_policy オブジェクトを受け付けず、
@@ -101,6 +122,7 @@ try:
     #     client_id=client_id, 
     #     certificate_path=cert_path,
     #     password=cert_password, 
+    #     proxies=proxies,                                   # 検証用プロキシ経由（DEBUG_PROXY で切替）
     #     connection_timeout=30,                             # 接続確立までのタイムアウト(秒)
     #     read_timeout=60,                                   # 応答待ちのタイムアウト(秒)
     #     retry_total=10,                                    # 全体の再試行上限
@@ -119,6 +141,7 @@ try:
         client_id=client_id, 
         certificate_path=cert_path,
         password=cert_password, 
+        proxies=proxies,                                 # 検証用プロキシ経由（DEBUG_PROXY で切替、無効時 None）
         connection_timeout=30,                           # 接続確立までのタイムアウト(秒)
         read_timeout=60,                                 # 応答待ちのタイムアウト(秒)
         retry_total=4,                                   # 全体の再試行上限
@@ -135,6 +158,7 @@ try:
     #     tenant_id=tenant_id,
     #     client_id=client_id, 
     #     certificate_path=cert_path,
+    #     proxies=proxies,
     #     connection_timeout=30,
     #     read_timeout=60,
     #     retry_total=10,
@@ -168,8 +192,12 @@ try:
         token_credential, scopes=scopes)
 
     # カスタムリトライ設定を適用した既定ミドルウェア付き HTTP クライアントを作成
+    # 検証用プロキシ(127.0.0.1:3128)経由にし、タイムアウトも指定する
+    # httpx.Timeout: connect=接続, read=読み取り, write=送信, pool=接続プール待ち(秒)
+    graph_timeout = httpx.Timeout(connect=30.0, read=60.0, write=60.0, pool=5.0)
     http_client = GraphClientFactory.create_with_default_middleware(
-        options={retry_handler_option.get_key(): retry_handler_option})
+        options={retry_handler_option.get_key(): retry_handler_option},
+        client=httpx.AsyncClient(proxy=proxy_url, timeout=graph_timeout))
 
     # request adapter を作成して GraphServiceClient を初期化
     request_adapter = GraphRequestAdapter(auth_provider, http_client)

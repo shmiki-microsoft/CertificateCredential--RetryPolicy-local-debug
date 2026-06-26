@@ -38,6 +38,27 @@ try:
     cert_path = os.getenv("AZURE_CLIENT_CERTIFICATE_PATH")
     cert_password = os.getenv("AZURE_CLIENT_CERTIFICATE_PASSWORD")
 
+    # === 検証用プロキシ設定 =============================================
+    # 環境変数 DEBUG_PROXY で proxy 経由のオン/オフを切り替える。
+    #   - DEBUG_PROXY=1 / true / on        → 既定 http://127.0.0.1:3128 を使用
+    #   - DEBUG_PROXY=http://host:port     → その URL をプロキシとして使用
+    #   - 未設定 / 0 / false / off        → プロキシを使わず直接通信
+    # baseline 版は既定の CertificateCredential / GraphServiceClient を使うため、
+    # HTTP_PROXY / HTTPS_PROXY 環境変数を設定する方式にする。
+    # （azure.core(requests) も httpx もこれらの環境変数を尊重するため両方経由になる）
+    _proxy_env = os.getenv("DEBUG_PROXY", "").strip()
+    if _proxy_env.lower() in ("1", "true", "on", "yes"):
+        proxy_url = "http://127.0.0.1:3128"             # 既定の検証用プロキシ
+    elif _proxy_env.lower() in ("", "0", "false", "off", "no"):
+        proxy_url = None                                # プロキシ無効（直接通信）
+    else:
+        proxy_url = _proxy_env                          # 明示指定された URL を使用
+    if proxy_url:
+        os.environ["HTTP_PROXY"] = proxy_url
+        os.environ["HTTPS_PROXY"] = proxy_url
+    print(f"DEBUG_PROXY: {'経由 ' + proxy_url if proxy_url else '無効（直接通信）'}")
+    # ------------------------------------------------------------------
+
     # 認証オブジェクトを取得（リトライ設定なし = SDK 既定の挙動）
     # 証明書が .pfx ファイルの時
     token_credential = CertificateCredential(
